@@ -97,7 +97,7 @@ def get_related_keywords_from_ads_api(keyword):
         customer_id = CUSTOMER_ID
         
         if not all([access_license, secret_key, customer_id]):
-            st.error("❌ 네이버 검색광고 API 설정이 필요합니다.")
+            st.warning("⚠️ 네이버 검색광고 API 설정이 필요합니다. 현재는 쇼핑 API만 사용합니다.")
             return []
         
         # 타임스탬프 생성
@@ -115,13 +115,16 @@ def get_related_keywords_from_ads_api(keyword):
             "Content-Type": "application/json"
         }
         
-        # GET 방식으로 쿼리 파라미터 전송
-        query_params = urllib.parse.urlencode({
-            'hintKeywords': keyword,
-            'showDetail': '1'
-        })
-        url = f"{BASE_URL}{API_PATH}?{query_params}"
-        request = urllib.request.Request(url, headers=headers, method=METHOD)
+        # 연관 키워드 요청 데이터
+        request_data = {
+            "hintKeywords": [keyword],
+            "showDetail": "1"
+        }
+        
+        # API 요청
+        url = f"{BASE_URL}{API_PATH}"
+        req_data = json.dumps(request_data).encode('utf-8')
+        request = urllib.request.Request(url, data=req_data, headers=headers, method=METHOD)
         
         with urllib.request.urlopen(request) as response:
             result = json.loads(response.read().decode('utf-8'))
@@ -130,20 +133,10 @@ def get_related_keywords_from_ads_api(keyword):
         related_keywords = []
         if 'keywordList' in result:
             for item in result['keywordList']:
-                # 검색량 처리 (문자열인 경우 0으로 처리)
-                pc_qc = item.get('monthlyPcQcCnt', 0)
-                mobile_qc = item.get('monthlyMobileQcCnt', 0)
-                
-                # "< 10" 같은 문자열 처리
-                if isinstance(pc_qc, str):
-                    pc_qc = 5 if "< 10" in pc_qc else 0
-                if isinstance(mobile_qc, str):
-                    mobile_qc = 5 if "< 10" in mobile_qc else 0
-                
                 related_keywords.append({
                     'keyword': item.get('relKeyword', ''),
-                    'monthly_pc_qc': pc_qc,
-                    'monthly_mobile_qc': mobile_qc,
+                    'monthly_pc_qc': item.get('monthlyPcQcCnt', 0),
+                    'monthly_mobile_qc': item.get('monthlyMobileQcCnt', 0),
                     'competition': item.get('compIdx', 'N/A'),
                     'source': 'ads_api'
                 })
@@ -151,7 +144,7 @@ def get_related_keywords_from_ads_api(keyword):
         return related_keywords
         
     except Exception as e:
-        st.error(f"❌ 검색광고 API 오류: {e}")
+        st.warning(f"검색광고 API 오류 (쇼핑 API로 대체): {e}")
         return []
 
 def get_shopping_related_keywords(keyword):
@@ -258,19 +251,56 @@ def get_shopping_related_keywords(keyword):
         return []
 
 def get_related_keywords(keyword):
-    """네이버 검색광고 API를 사용하여 연관 키워드 추출"""
-    # 네이버 검색광고 API에서 연관 키워드 가져오기
-    st.info("🎯 네이버 검색광고 API에서 연관 키워드 수집 중...")
-    related_keywords = get_related_keywords_from_ads_api(keyword)
+    """네이버 검색광고 API와 쇼핑 API를 통합하여 연관 키워드 추출"""
+    all_related_keywords = []
     
-    if related_keywords:
-        # 검색량 기준으로 정렬
-        related_keywords.sort(key=lambda x: (x.get('monthly_pc_qc', 0) + x.get('monthly_mobile_qc', 0)), reverse=True)
-        st.success(f"🎉 총 {len(related_keywords)}개의 연관 키워드를 발견했습니다!")
-        return related_keywords
+    # 1. 네이버 검색광고 API에서 연관 키워드 가져오기
+    st.info("🎯 네이버 검색광고 API에서 연관 키워드 수집 중...")
+    ads_keywords = get_related_keywords_from_ads_api(keyword)
+    
+    if ads_keywords:
+        st.success(f"✅ 검색광고 API에서 {len(ads_keywords)}개 키워드 수집 완료!")
+        all_related_keywords.extend(ads_keywords)
     else:
-        st.error("❌ 연관 키워드를 찾을 수 없습니다.")
-        return []
+        st.info("ℹ️ 검색광고 API 사용 불가. 쇼핑 API만 사용합니다.")
+    
+    # 2. 네이버 쇼핑 API에서 추가 연관 키워드 가져오기
+    st.info("🛒 네이버 쇼핑 API에서 추가 연관 키워드 수집 중...")
+    shopping_keywords = get_shopping_related_keywords(keyword)
+    
+    if shopping_keywords:
+        st.success(f"✅ 쇼핑 API에서 {len(shopping_keywords)}개 키워드 수집 완료!")
+        all_related_keywords.extend(shopping_keywords)
+    
+    # 3. 중복 제거 및 통합
+    unique_keywords = {}
+    for kw_data in all_related_keywords:
+        kw = kw_data['keyword']
+        if kw not in unique_keywords:
+            unique_keywords[kw] = kw_data
+        else:
+            # 같은 키워드가 있으면 정보 통합
+            existing = unique_keywords[kw]
+            if kw_data.get('source') == 'ads_api':
+                # 검색광고 API 데이터가 더 정확하므로 우선
+                unique_keywords[kw] = kw_data
+    
+    # 4. 결과 정렬 및 반환
+    final_keywords = list(unique_keywords.values())
+    
+    # 검색광고 API 데이터가 있으면 검색량 기준으로, 없으면 빈도 기준으로 정렬
+    if any(kw.get('source') == 'ads_api' for kw in final_keywords):
+        final_keywords.sort(key=lambda x: (x.get('monthly_pc_qc', 0) + x.get('monthly_mobile_qc', 0)), reverse=True)
+    else:
+        final_keywords.sort(key=lambda x: x.get('frequency', 0), reverse=True)
+    
+    total_count = len(final_keywords)
+    ads_count = len([kw for kw in final_keywords if kw.get('source') == 'ads_api'])
+    shopping_count = total_count - ads_count
+    
+    st.success(f"🎉 총 {total_count}개의 연관 키워드를 발견했습니다! (검색광고 API: {ads_count}개, 쇼핑 API: {shopping_count}개)")
+    
+    return final_keywords
 
 def render_rank_checker_tab():
     """순위 확인 탭 렌더링"""
@@ -299,7 +329,7 @@ def render_rank_checker_tab():
         )
         
         # 검색 버튼
-        search_button = st.button("🔍 순위 확인", type="primary", width="stretch", key="rank_search")
+        search_button = st.button("🔍 순위 확인", type="primary", use_container_width=True, key="rank_search")
     
     with col2:
         st.info("### 💡 팁\n- 정확한 판매처명을 입력하세요\n- 키워드는 구체적으로 입력할수록 정확합니다")
@@ -380,17 +410,17 @@ def render_rank_checker_tab():
                 with col3:
                     st.write(f"{int(product['price']):,}원")
                 with col4:
-                    st.link_button("상품보기", product['link'], width="stretch")
+                    st.link_button("상품보기", product['link'], use_container_width=True)
 
 def render_related_keywords_tab():
     """연관 키워드 탭 렌더링"""
     # 사이드바에 정보 표시
     with st.sidebar:
         st.info("### 🔗 연관 키워드\n1. 기준이 될 키워드 입력\n2. 연관 키워드 검색 버튼 클릭\n3. 결과를 CSV로 다운로드 가능")
-        st.success("🎯 네이버 검색광고 API 사용!")
-        st.info("📊 공식 검색광고 데이터")
+        st.success("🚀 듀얼 API 통합 시스템!")
+        st.info("📊 네이버 검색광고 API + 쇼핑 API")
         st.success("✨ 검색량, 경쟁도 정보 제공")
-        st.warning("⚠️ 정확한 마케팅 데이터를 제공합니다.")
+        st.warning("⚠️ 더 정확한 분석을 위해 시간이 조금 더 걸립니다.")
     
     # 메인 입력 영역
     col1, col2 = st.columns([2, 1])
@@ -413,11 +443,11 @@ def render_related_keywords_tab():
         )
         
         # 검색 버튼
-        search_related_button = st.button("🎯 연관 키워드 검색 (검색광고 API)", type="primary", width="stretch", key="related_search")
+        search_related_button = st.button("🔗 연관 키워드 검색 (듀얼 API)", type="primary", use_container_width=True, key="related_search")
     
     with col2:
         st.info("### 💡 연관 키워드란?\n- 입력한 키워드와 함께 검색되는 단어들\n- 마케팅 키워드 발굴에 유용\n- 상품명 최적화에 활용 가능")
-        st.success("### 🎯 네이버 검색광고 API\n- 🎯 공식 연관 키워드 데이터\n- 📊 정확한 검색량 정보\n- 💡 경쟁도 분석\n- ✨ 마케팅 최적화")
+        st.success("### 🚀 듀얼 API 통합 시스템\n- 🎯 네이버 검색광고 API (공식 연관어)\n- 🛒 네이버 쇼핑 API (상품 데이터)\n- 📊 검색량, 경쟁도 정보 제공\n- ✨ 중복 제거 및 지능형 통합")
     
     # 검색 실행
     if search_related_button:
@@ -431,8 +461,8 @@ def render_related_keywords_tab():
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        status_text.text("🎯 네이버 검색광고 API에서 데이터를 수집하는 중...")
-        progress_bar.progress(0.5)
+        status_text.text("🔍 듀얼 API에서 데이터를 수집하는 중...")
+        progress_bar.progress(0.3)
         
         # 연관 키워드 검색
         related_keywords = get_related_keywords(base_keyword)
@@ -444,17 +474,27 @@ def render_related_keywords_tab():
             st.divider()
             st.subheader(f"🔗 '{base_keyword}'의 연관 키워드")
             
-            # 결과를 DataFrame으로 변환
+            # 결과를 DataFrame으로 변환 (API 소스별로 컬럼 구성)
             df_data = []
             for kw in related_keywords:
-                df_data.append({
-                    'keyword': kw['keyword'],
-                    'pc_search': kw.get('monthly_pc_qc', 0),
-                    'mobile_search': kw.get('monthly_mobile_qc', 0),
-                    'total_search': kw.get('monthly_pc_qc', 0) + kw.get('monthly_mobile_qc', 0),
-                    'competition': kw.get('competition', 'N/A'),
-                    'source': '검색광고 API'
-                })
+                if kw.get('source') == 'ads_api':
+                    df_data.append({
+                        'keyword': kw['keyword'],
+                        'pc_search': kw.get('monthly_pc_qc', 0),
+                        'mobile_search': kw.get('monthly_mobile_qc', 0),
+                        'total_search': kw.get('monthly_pc_qc', 0) + kw.get('monthly_mobile_qc', 0),
+                        'competition': kw.get('competition', 'N/A'),
+                        'source': '검색광고 API'
+                    })
+                else:
+                    df_data.append({
+                        'keyword': kw['keyword'],
+                        'pc_search': 0,
+                        'mobile_search': 0,
+                        'total_search': kw.get('frequency', 0),
+                        'competition': 'N/A',
+                        'source': '쇼핑 API'
+                    })
             
             df = pd.DataFrame(df_data)
             
@@ -463,13 +503,17 @@ def render_related_keywords_tab():
             with col1:
                 st.metric("총 연관 키워드", len(related_keywords))
             with col2:
-                st.metric("데이터 소스", "검색광고 API")
+                ads_count = len([kw for kw in related_keywords if kw.get('source') == 'ads_api'])
+                st.metric("검색광고 API", f"{ads_count}개")
             with col3:
-                avg_search = df['total_search'].mean()
-                st.metric("평균 검색량", f"{int(avg_search):,}")
+                shopping_count = len(related_keywords) - ads_count
+                st.metric("쇼핑 API", f"{shopping_count}개")
             with col4:
-                total_search = df['total_search'].sum()
-                st.metric("총 검색량", f"{int(total_search):,}")
+                if ads_count > 0:
+                    avg_search = df[df['source'] == '검색광고 API']['total_search'].mean()
+                    st.metric("평균 검색량", f"{int(avg_search):,}")
+                else:
+                    st.metric("데이터 소스", "쇼핑 API")
             
             # 상위 키워드를 차트로 표시 (옵션에 따라)
             if show_top_chart:
@@ -575,7 +619,7 @@ def render_related_keywords_tab():
                     data=csv_data,
                     file_name=f"{base_keyword}_연관키워드_필터_{time.strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv",
-                    width="stretch"
+                    use_container_width=True
                 )
             
             with col_download2:
@@ -590,7 +634,7 @@ def render_related_keywords_tab():
                     data=full_csv_data,
                     file_name=f"{base_keyword}_연관키워드_전체_{time.strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv",
-                    width="stretch"
+                    use_container_width=True
                 )
             
             # 키워드 클라우드 스타일 표시
