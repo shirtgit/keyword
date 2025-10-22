@@ -1,24 +1,21 @@
 """
-본 프로그램 'RankChecker by L&C'는 Link&Co, Inc.에 의해 개발된 소프트웨어입니다.
+본 프로그램 'RankChecker by 쇼쇼'는 쇼쇼에 의해 개발된 소프트웨어입니다.
 해당 소스코드 및 실행 파일의 무단 복제, 배포, 역컴파일, 수정은
 저작권법 및 컴퓨터프로그램 보호법에 따라 엄격히 금지됩니다.
 
 무단 유포 및 상업적 이용 시 민형사상 법적 책임을 물을 수 있습니다.
 ※ 본 프로그램은 사용자 추적 및 차단 기능이 포함되어 있습니다.
 
-Copyright ⓒ 2025 Link&Co. All rights reserved.
+Copyright ⓒ 2025 쇼쇼. All rights reserved.
 Unauthorized reproduction or redistribution is strictly prohibited. 
 """
  
 import sys
 import os
-import uuid
-import socket
 import json
 import urllib.request
 import urllib.parse
 import re
-from datetime import datetime
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QTextBrowser, QTextEdit,
@@ -27,88 +24,25 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QFont, QKeyEvent, QIcon
 from dotenv import load_dotenv
-from pyairtable import Table
 
 # Load environment variables
 load_dotenv()
-AIRTABLE_API_KEY = os.getenv("AIRTABLE_API_KEY")
-BASE_ID = os.getenv("BASE_ID")
-CONTROL_TABLE = "Control"
-LOG_TABLE = "SearchLogs"
-BAN_TABLE = "BanList"
 
-client_id = "32b78xVQuwuIYx_PFBG4"
-client_secret = "zOymQ0RN2o"
-UUID_FILE = "user_uuid.txt"
+# 네이버 개발자 API
+client_id = os.getenv("NAVER_CLIENT_ID", "RMAReoKGgZ73JCL3AdhK")
+client_secret = os.getenv("NAVER_CLIENT_SECRET", "SZS7VRIQDT")
 
-def get_user_id():
-    if os.path.exists(UUID_FILE):
-        with open(UUID_FILE, "r") as f:
-            return f.read().strip()
-    new_id = str(uuid.uuid4())
-    with open(UUID_FILE, "w") as f:
-        f.write(new_id)
-    return new_id
+# 네이버 광고센터 API (필요시 사용)
+CUSTOMER_ID = os.getenv("CUSTOMER_ID")
+ACCESS_LICENSE = os.getenv("ACCESS_LICENSE")
+SECRET_KEY = os.getenv("SECRET_KEY")
 
-def get_public_ip():
-    try:
-        with urllib.request.urlopen("https://api.ipify.org") as response:
-            return response.read().decode()
-    except:
-        return "Unknown"
 
-def check_app_status():
-    url = f"https://api.airtable.com/v0/{BASE_ID}/{CONTROL_TABLE}"
-    headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req) as res:
-            data = json.loads(res.read())
-            record = data["records"][0]["fields"]
-            if record.get("flag", "").upper() != "ON":
-                QMessageBox.critical(None, "사용 중지됨", record.get("message", "관리자에 의해 차단되었습니다."))
-                sys.exit()
-    except Exception as e:
-        QMessageBox.critical(None, "접속 오류", f"서버 접속 실패: {e}")
-        sys.exit()
 
-def check_ip_blocked():
-    user_ip = get_public_ip()
-    url = f"https://api.airtable.com/v0/{BASE_ID}/{BAN_TABLE}"
-    headers = {"Authorization": f"Bearer {AIRTABLE_API_KEY}"}
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req) as res:
-            data = json.loads(res.read())
-            for record in data["records"]:
-                fields = record.get("fields", {})
-                if fields.get("ip") == user_ip and fields.get("blocked", False):
-                    msg = fields.get("reason", "권한이 만료되었습니다.")
-                    QMessageBox.critical(None, "차단됨", msg)
-                    sys.exit()
-    except Exception as e:
-        QMessageBox.critical(None, "차단 확인 실패", f"차단 여부 확인 실패: {e}")
-        sys.exit()
 
-def send_log(mall_name, keywords, results_dict):
-    try:
-        table = Table(AIRTABLE_API_KEY, BASE_ID, LOG_TABLE)
-        flat_results = "\n".join([
-            f"{kw} → {val if isinstance(val, str) else val['rank']}위, {val['title'][:20]}..."
-            if isinstance(val, dict) else f"{kw} → 없음"
-            for kw, val in results_dict.items()
-        ])
-        table.create({
-            "uuid": get_user_id(),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "ip": get_public_ip(),
-            "seller_name": mall_name,
-            "keywords": ", ".join(keywords),
-            "results_json": flat_results
-        })
-        print("✅ pyairtable 기록 성공")
-    except Exception as e:
-        print(f"⚠️ pyairtable 기록 실패: {e}")
+
+
+
 
 class CustomTextEdit(QTextEdit):
     def keyPressEvent(self, event: QKeyEvent):
@@ -188,12 +122,9 @@ def resource_path(relative_path):
 class RankCheckerApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("네이버 순위 확인기 (by 링크앤코
-    )")
+        self.setWindowTitle("네이버 순위 확인기 (by 쇼쇼)")
         self.setWindowIcon(QIcon(resource_path("logo_inner.ico")))
         self.resize(780, 720)
-        check_app_status()
-        check_ip_blocked()
         self.setup_ui()
 
     def setup_ui(self):
@@ -237,8 +168,7 @@ class RankCheckerApp(QWidget):
 
         self.setLayout(layout)
 
-        footer = QLabel("ⓒ 2025 링크앤코
-    . 무단 복제 및 배포 금지. All rights reserved.")
+        footer = QLabel("ⓒ 2025 쇼쇼. 무단 복제 및 배포 금지. All rights reserved.")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet("color: gray; font-size: 10px;")
         layout.addWidget(footer)
@@ -274,7 +204,6 @@ class RankCheckerApp(QWidget):
         self.worker = Worker(self.keywords, self.mall_name)
         self.worker.result_ready.connect(self.append_result)
         self.worker.progress_update.connect(self.update_status)
-        self.worker.finished_all.connect(lambda results: send_log(self.mall_name, self.keywords, results))
         self.worker.finished_all.connect(lambda _: self.status_timer.stop())
         self.worker.start()
 
