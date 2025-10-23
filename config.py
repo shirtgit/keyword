@@ -22,6 +22,9 @@ class APIConfig:
     ACCESS_LICENSE = os.getenv("ACCESS_LICENSE")
     SECRET_KEY = os.getenv("SECRET_KEY")
     
+    # Google Gemini API
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyAMMcJt93wdo8FNY22MGQrvl9o4BiF10-c")
+    
     # API URLs
     NAVER_SHOPPING_API_URL = "https://openapi.naver.com/v1/search/shop.json"
     NAVER_ADS_API_BASE_URL = "https://api.naver.com"
