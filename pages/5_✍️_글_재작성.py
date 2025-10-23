@@ -7,8 +7,8 @@ import streamlit as st
 import google.generativeai as genai
 import time
 import re
-from config import APIConfig, AppConfig
-from auth import initialize_session, is_logged_in, render_logout_section
+from config import APIConfig, AppConfig, AuthConfig
+from auth import initialize_session, is_logged_in, render_logout_section, logout_user
 
 def render_navigation_sidebar():
     """사이드바 네비게이션 렌더링"""
@@ -62,9 +62,24 @@ def render_navigation_sidebar():
         st.success("🟢 모든 시스템 정상")
         st.info("🤖 Gemini AI 연결됨")
         
-        # 사용자 정보
+        # 사용자 정보 및 로그아웃
         current_user = st.session_state.get('username', 'Unknown')
         st.markdown(f"### 👤 사용자: **{current_user}**")
+        
+        # 세션 정보 표시
+        if st.session_state.get('login_timestamp'):
+            days_left = AuthConfig.SESSION_DURATION_DAYS - int((time.time() - st.session_state.login_timestamp) / (24 * 60 * 60))
+            if days_left > 0:
+                st.caption(f"🔒 세션 유지: {days_left}일 남음")
+        
+        st.markdown("---")
+        
+        # 로그아웃 버튼
+        if st.button("🚪 로그아웃", use_container_width=True, key="sidebar_logout"):
+            logout_user()
+            st.success("✅ 로그아웃되었습니다.")
+            time.sleep(1)
+            st.rerun()
 
 def initialize_gemini():
     """Gemini API 초기화"""
@@ -310,30 +325,13 @@ def render_content_rewriter_page():
     # 사이드바 네비게이션
     render_navigation_sidebar()
     
-    # 헤더와 로그인 정보
-    header_left, header_right = st.columns([3, 1])
-    with header_left:
-        st.markdown("""
-        <div class="rewriter-header">
-            <h1 class="rewriter-title">✍️ AI 글 재작성</h1>
-            <p class="rewriter-subtitle">Gemini AI로 전문적인 카피라이팅을 경험하세요</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with header_right:
-        current_user = st.session_state.get('username', 'Unknown')
-        st.markdown(f"""
-        <div style="
-            text-align: right; 
-            font-size: 0.8rem; 
-            color: #666; 
-            margin-bottom: 0.5rem;
-            width: 100%;
-        ">
-            👤 <strong>{current_user}</strong>
-        </div>
-        """, unsafe_allow_html=True)
-        render_logout_section()
+    # 가운데 정렬된 헤더
+    st.markdown("""
+    <div class="rewriter-header">
+        <h1 class="rewriter-title">✍️ AI 글 재작성</h1>
+        <p class="rewriter-subtitle">Gemini AI로 전문적인 카피라이팅을 경험하세요</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # 기능 설명
     st.info("""
@@ -379,12 +377,15 @@ def render_content_rewriter_page():
         # 글자수 표시
         if original_text:
             char_count = count_characters(original_text)
+            word_count = len(original_text.split()) if original_text else 0
+            line_count = len(original_text.splitlines()) if original_text else 0
+            
             st.markdown(f"""
             <div class="stats-container">
                 <h4>📊 원본 글 통계</h4>
                 <p><strong>글자수:</strong> {char_count:,}자 (공백/이모지 제외)</p>
-                <p><strong>단어수:</strong> {len(original_text.split()):,}개</p>
-                <p><strong>줄수:</strong> {len(original_text.splitlines()):,}줄</p>
+                <p><strong>단어수:</strong> {word_count:,}개</p>
+                <p><strong>줄수:</strong> {line_count:,}줄</p>
             </div>
             """, unsafe_allow_html=True)
     

@@ -38,27 +38,21 @@ def render_navigation_sidebar():
         
         st.markdown("---")
         
-        # 퀵 액세스
-        st.markdown("### ⚡ 퀵 액세스")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔍", help="순위 확인 바로가기"):
-                st.switch_page("pages/1_🎯_순위_확인.py")
-        with col2:
-            if st.button("📊", help="키워드 분석 바로가기"):
-                st.switch_page("pages/2_🔗_연관_키워드.py")
-        
-        st.markdown("---")
-        
         # 시스템 상태
         st.markdown("### 🔧 시스템 상태")
         st.success("🟢 모든 시스템 정상")
         st.info("📡 API 연결 안정")
         
-        # 사용자 정보
+        # 사용자 정보 및 로그아웃
         current_user = st.session_state.get('username', 'Unknown')
         st.markdown(f"### 👤 사용자: **{current_user}**")
+        
+        # 로그아웃 버튼
+        if st.button("🚪 로그아웃", use_container_width=True, type="secondary"):
+            from auth import logout_user
+            logout_user()
+            st.success("✅ 로그아웃되었습니다.")
+            st.rerun()
 
 def render_dashboard_overview():
     """대시보드 개요 렌더링"""
@@ -97,21 +91,36 @@ def render_dashboard_overview():
         font-weight: 400;
     }
     
-    /* 카드 스타일 - 시스템 테마 대응 */
+    /* 카드 스타일 - 가독성 개선 */
     .feature-card {
-        background: var(--background-color, white);
+        background: #ffffff !important;
         border-radius: 12px;
         padding: 1.5rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-        border: 1px solid rgba(32, 178, 170, 0.2);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        border: 1px solid rgba(32, 178, 170, 0.3);
         height: 100%;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         margin-bottom: 1rem;
     }
     
+    /* 다크모드 대응 */
+    @media (prefers-color-scheme: dark) {
+        .feature-card {
+            background: #1e293b !important;
+            border: 1px solid rgba(32, 178, 170, 0.4);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        }
+        .feature-title {
+            color: #48D1CC !important;
+        }
+        .feature-desc {
+            color: #e2e8f0 !important;
+        }
+    }
+    
     .feature-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 20px rgba(32, 178, 170, 0.2);
+        box-shadow: 0 4px 20px rgba(32, 178, 170, 0.25);
     }
     
     .feature-icon {
@@ -124,14 +133,15 @@ def render_dashboard_overview():
         font-size: 1.3rem;
         font-weight: 600;
         margin-bottom: 0.8rem;
-        color: #20B2AA;
+        color: #20B2AA !important;
     }
     
     .feature-desc {
         font-size: 0.95rem;
         line-height: 1.5;
         margin-bottom: 1.2rem;
-        opacity: 0.8;
+        color: #4a5568 !important;
+        opacity: 1;
     }
     
     /* 버튼 스타일 - 고정 색상 */
@@ -186,11 +196,6 @@ def render_dashboard_overview():
         <p class="main-subtitle">by 쇼쇼 | 현대적이고 심플한 마케팅 도구</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # 로그아웃 섹션을 우상단에 배치
-    col_spacer, col_logout = st.columns([4, 1])
-    with col_logout:
-        render_logout_section()
     
     # 심플한 기능 카드
     col1, col2, col3 = st.columns(3, gap="large")

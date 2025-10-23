@@ -7,8 +7,8 @@ import streamlit as st
 import pandas as pd
 import time
 from api import get_top_ranked_product_by_mall
-from config import AppConfig
-from auth import initialize_session, is_logged_in, render_logout_section
+from config import AppConfig, AuthConfig
+from auth import initialize_session, is_logged_in, logout_user
 
 def render_navigation_sidebar():
     """사이드바 네비게이션 렌더링"""
@@ -50,9 +50,24 @@ def render_navigation_sidebar():
         - 최대 10개 키워드 동시 검색
         """)
         
-        # 사용자 정보
+        # 사용자 정보 및 로그아웃
         current_user = st.session_state.get('username', 'Unknown')
         st.markdown(f"### 👤 사용자: **{current_user}**")
+        
+        # 세션 정보 표시
+        if st.session_state.get('login_timestamp'):
+            days_left = AuthConfig.SESSION_DURATION_DAYS - int((time.time() - st.session_state.login_timestamp) / (24 * 60 * 60))
+            if days_left > 0:
+                st.caption(f"🔒 세션 유지: {days_left}일 남음")
+        
+        st.markdown("---")
+        
+        # 로그아웃 버튼
+        if st.button("🚪 로그아웃", use_container_width=True, key="sidebar_logout"):
+            logout_user()
+            st.success("✅ 로그아웃되었습니다.")
+            time.sleep(1)
+            st.rerun()
 
 def render_rank_checker_page():
     """순위 확인 페이지 렌더링"""
@@ -141,13 +156,6 @@ def render_rank_checker_page():
         <p class="page-subtitle">네이버 쇼핑에서 키워드별 판매처 순위를 실시간으로 확인하세요</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # 로그아웃 섹션을 우상단에 배치
-    col_spacer, col_logout = st.columns([4, 1])
-    with col_logout:
-        render_logout_section()
-    
-
     
     # 메인 입력 영역
     col1, col2 = st.columns([3, 1])

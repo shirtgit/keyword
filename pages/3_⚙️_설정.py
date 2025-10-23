@@ -6,7 +6,7 @@
 import streamlit as st
 import os
 from config import AppConfig, APIConfig, AuthConfig
-from auth import initialize_session, is_logged_in, render_logout_section
+from auth import initialize_session, is_logged_in, logout_user
 
 def render_navigation_sidebar():
     """사이드바 네비게이션 렌더링"""
@@ -47,9 +47,27 @@ def render_navigation_sidebar():
         - 애플리케이션 정보
         """)
         
-        # 사용자 정보
+        # 사용자 정보 및 로그아웃
         current_user = st.session_state.get('username', 'Unknown')
         st.markdown(f"### 👤 사용자: **{current_user}**")
+        
+        # 세션 정보 표시
+        if st.session_state.get('login_timestamp'):
+            import time
+            from config import AuthConfig
+            days_left = AuthConfig.SESSION_DURATION_DAYS - int((time.time() - st.session_state.login_timestamp) / (24 * 60 * 60))
+            if days_left > 0:
+                st.caption(f"🔒 세션 유지: {days_left}일 남음")
+        
+        st.markdown("---")
+        
+        # 로그아웃 버튼
+        if st.button("🚪 로그아웃", use_container_width=True, key="sidebar_logout"):
+            from auth import logout_user
+            logout_user()
+            st.success("✅ 로그아웃되었습니다.")
+            time.sleep(1)
+            st.rerun()
 
 def render_settings_page():
     """설정 페이지 렌더링"""
@@ -57,12 +75,8 @@ def render_settings_page():
     render_navigation_sidebar()
     
     # 헤더
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.title("⚙️ 시스템 설정")
-        st.markdown("**시스템 환경설정 및 계정 관리**")
-    with col2:
-        render_logout_section()
+    st.title("⚙️ 시스템 설정")
+    st.markdown("**시스템 환경설정 및 계정 관리**")
     
     st.markdown("---")
     

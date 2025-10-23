@@ -9,7 +9,7 @@ import pandas as pd
 import time
 from api import get_detailed_keyword_stats
 from config import AppConfig
-from auth import initialize_session, is_logged_in, render_logout_section
+from auth import initialize_session, is_logged_in, logout_user
 
 def render_navigation_sidebar():
     """사이드바 네비게이션 렌더링"""
@@ -53,9 +53,27 @@ def render_navigation_sidebar():
         - 📢 광고수 추정
         """)
         
-        # 사용자 정보
+        # 사용자 정보 및 로그아웃
         current_user = st.session_state.get('username', 'Unknown')
         st.markdown(f"### 👤 사용자: **{current_user}**")
+        
+        # 세션 정보 표시
+        if st.session_state.get('login_timestamp'):
+            import time
+            from config import AuthConfig
+            days_left = AuthConfig.SESSION_DURATION_DAYS - int((time.time() - st.session_state.login_timestamp) / (24 * 60 * 60))
+            if days_left > 0:
+                st.caption(f"🔒 세션 유지: {days_left}일 남음")
+        
+        st.markdown("---")
+        
+        # 로그아웃 버튼
+        if st.button("🚪 로그아웃", use_container_width=True, key="sidebar_logout"):
+            from auth import logout_user
+            logout_user()
+            st.success("✅ 로그아웃되었습니다.")
+            time.sleep(1)
+            st.rerun()
 
 def render_keyword_detail_analysis_page():
     """키워드 상세 분석 페이지 렌더링"""
@@ -63,12 +81,8 @@ def render_keyword_detail_analysis_page():
     render_navigation_sidebar()
     
     # 헤더
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.title("📊 키워드 상세 분석")
-        st.markdown("**네이버 검색광고 API로 키워드의 완전한 통계 분석을 수행하세요**")
-    with col2:
-        render_logout_section()
+    st.title("📊 키워드 상세 분석")
+    st.markdown("**네이버 검색광고 API로 키워드의 완전한 통계 분석을 수행하세요**")
     
     st.markdown("---")
     
