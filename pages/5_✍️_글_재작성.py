@@ -128,10 +128,15 @@ def rewrite_content(original_text, mode="일반"):
 - 톤앤매너: 신뢰감 있으면서도 접근하기 쉬운 전문가 톤
 - 문단 구성: 각 소제목 하에 충분한 내용으로 구성 (최소 200-300자씩)
 
+**중요한 출력 규칙:**
+- 제목과 본문 외에는 절대 다른 내용을 추가하지 마세요
+- 설명, 부연설명, 메타데이터, 주석, 참고사항 등 일체 금지
+- 순수하게 제목과 본문 내용만 출력하세요
+
 **원본 글:**
 {original_text}
 
-**응답 형식:**
+**응답 형식 (이 형식을 정확히 지켜주세요):**
 제목: [새로운 제목]
 
 본문:
@@ -168,10 +173,15 @@ def rewrite_content(original_text, mode="일반"):
 - HTML 구성: section/article 태그로 논리적 구조화, 각 섹션별 충분한 내용
 - 시각적 요소: 박스, 강조, 목록 등을 활용하여 가독성 향상
 
+**중요한 출력 규칙:**
+- 제목과 HTML 본문 외에는 절대 다른 내용을 추가하지 마세요
+- 설명, 부연설명, 메타데이터, 주석, 참고사항 등 일체 금지
+- 순수하게 제목과 HTML 본문만 출력하세요
+
 **원본 글:**
 {original_text}
 
-**응답 형식:**
+**응답 형식 (이 형식을 정확히 지켜주세요):**
 제목: [새로운 제목]
 
 HTML:
@@ -333,6 +343,7 @@ def render_content_rewriter_page():
     - **유사문서 회피** - 완전히 새로운 표현으로 재작성
     - **전문적 어투** - 친절하고 소개하는 말투로 작성
     - **체계적 구조** - 소제목별 문단 구성으로 가독성 향상
+    - **순수 콘텐츠** - 제목과 본문 외 불필요한 내용 제거
     - **HTML 모드** - 웹사이트용 스타일링된 콘텐츠 생성
     - **실시간 글자수 체크** - 공백/이모지 제외 정확한 카운팅
     """)
@@ -415,6 +426,7 @@ def render_content_rewriter_page():
                 # 결과 저장
                 st.session_state.rewrite_result = result
                 st.session_state.rewrite_mode = mode
+                st.session_state.original_text = original_text
                 st.success("🎉 글 재작성이 완료되었습니다!")
             else:
                 st.error("글 재작성 중 오류가 발생했습니다. 다시 시도해주세요.")
@@ -483,10 +495,14 @@ def render_content_rewriter_page():
         col1, col2, col3 = st.columns(3)
         
         with col1:
+            original_text_stored = st.session_state.get('original_text', '')
+            original_char_count = count_characters(original_text_stored) if original_text_stored else 0
+            char_diff = result_char_count - original_char_count
+            
             st.metric(
                 "📊 재작성 글자수",
                 f"{result_char_count:,}자",
-                f"{result_char_count - count_characters(original_text):+,}자"
+                f"{char_diff:+,}자" if original_char_count > 0 else "신규 작성"
             )
         
         with col2:
@@ -497,12 +513,23 @@ def render_content_rewriter_page():
             )
         
         with col3:
-            improvement = ((len(result_text.split()) - len(original_text.split())) / len(original_text.split())) * 100
-            st.metric(
-                "📈 내용 확장률",
-                f"{improvement:+.1f}%",
-                "단어 기준"
-            )
+            original_text_stored = st.session_state.get('original_text', '')
+            original_word_count = len(original_text_stored.split()) if original_text_stored else 0
+            result_word_count = len(result_text.split())
+            
+            if original_word_count > 0:
+                improvement = ((result_word_count - original_word_count) / original_word_count) * 100
+                st.metric(
+                    "📈 내용 확장률",
+                    f"{improvement:+.1f}%",
+                    "단어 기준"
+                )
+            else:
+                st.metric(
+                    "📈 내용 확장률",
+                    f"{result_word_count}개",
+                    "신규 단어"
+                )
         
         # 다운로드 버튼
         st.markdown("---")
@@ -526,14 +553,128 @@ def render_content_rewriter_page():
         
         with col2:
             if st.button("🔄 새로운 글 재작성", use_container_width=True):
-                del st.session_state.rewrite_result
-                del st.session_state.rewrite_mode
+                if 'rewrite_result' in st.session_state:
+                    del st.session_state.rewrite_result
+                if 'rewrite_mode' in st.session_state:
+                    del st.session_state.rewrite_mode
+                if 'original_text' in st.session_state:
+                    del st.session_state.original_text
                 st.rerun()
         
         with col3:
             if st.button("📋 결과 복사", use_container_width=True):
-                st.write("결과가 클립보드에 복사되었습니다!")
-                st.code(result_text)
+                # 결과 모드에 따라 복사할 내용 결정
+                result_mode = st.session_state.get('rewrite_mode', '일반')
+                
+                st.info("💡 **복사 방법 안내:**\n- 🔗 버튼 클릭: 자동 복사 (브라우저 지원 시)\n- 📝 텍스트 영역: 전체 선택(Ctrl+A) 후 복사(Ctrl+C)")
+                
+                if result_mode == "HTML":
+                    # HTML 모드: HTML 코드만 추출
+                    if "HTML:" in result_text:
+                        html_content = result_text.split("HTML:")[1].strip()
+                    else:
+                        html_content = content_part
+                    
+                    st.success("📋 HTML 코드가 복사 준비되었습니다!")
+                    st.markdown("**복사할 HTML 코드:**")
+                    st.code(html_content, language="html")
+                    
+                    # JavaScript를 사용한 클립보드 복사
+                    st.markdown(f"""
+                    <div style="margin-top: 10px;">
+                        <button onclick="copyToClipboard()" style="
+                            background: linear-gradient(135deg, #20B2AA, #48D1CC);
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            font-weight: 600;
+                        ">🔗 HTML 코드 복사</button>
+                    </div>
+                    
+                    <script>
+                    function copyToClipboard() {{
+                        const htmlCode = `{html_content.replace('`', '\\`')}`;
+                        navigator.clipboard.writeText(htmlCode).then(function() {{
+                            alert('HTML 코드가 클립보드에 복사되었습니다!');
+                        }}, function(err) {{
+                            console.error('복사 실패: ', err);
+                            // 대체 방법: 텍스트 선택
+                            const textArea = document.createElement('textarea');
+                            textArea.value = htmlCode;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            alert('HTML 코드가 클립보드에 복사되었습니다!');
+                        }});
+                    }}
+                    </script>
+                    """, unsafe_allow_html=True)
+                    
+                    # 수동 복사를 위한 텍스트 영역 (HTML 모드)
+                    st.markdown("**🌐 수동 복사 (전체 선택 후 Ctrl+C):**")
+                    if "HTML:" in result_text:
+                        html_content = result_text.split("HTML:")[1].strip()
+                    else:
+                        html_content = content_part
+                    st.text_area(
+                        "HTML 코드 (전체 선택 후 복사)",
+                        html_content,
+                        height=200,
+                        key="html_copy_area"
+                    )
+                    
+                else:
+                    # 일반 모드: 전체 텍스트
+                    st.success("📋 텍스트가 복사 준비되었습니다!")
+                    st.markdown("**복사할 텍스트:**")
+                    st.code(result_text, language="text")
+                    
+                    # JavaScript를 사용한 클립보드 복사
+                    clean_text = result_text.replace('`', '\\`').replace('\n', '\\n')
+                    st.markdown(f"""
+                    <div style="margin-top: 10px;">
+                        <button onclick="copyTextToClipboard()" style="
+                            background: linear-gradient(135deg, #20B2AA, #48D1CC);
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            font-weight: 600;
+                        ">📝 텍스트 복사</button>
+                    </div>
+                    
+                    <script>
+                    function copyTextToClipboard() {{
+                        const textContent = `{clean_text}`;
+                        navigator.clipboard.writeText(textContent).then(function() {{
+                            alert('텍스트가 클립보드에 복사되었습니다!');
+                        }}, function(err) {{
+                            console.error('복사 실패: ', err);
+                            // 대체 방법: 텍스트 선택
+                            const textArea = document.createElement('textarea');
+                            textArea.value = textContent;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            alert('텍스트가 클립보드에 복사되었습니다!');
+                        }});
+                    }}
+                    </script>
+                    """, unsafe_allow_html=True)
+                    
+                    # 수동 복사를 위한 텍스트 영역 (일반 모드)
+                    st.markdown("**📝 수동 복사 (전체 선택 후 Ctrl+C):**")
+                    st.text_area(
+                        "재작성된 텍스트 (전체 선택 후 복사)",
+                        result_text,
+                        height=200,
+                        key="text_copy_area"
+                    )
 
 def main():
     """글 재작성 페이지 메인"""
