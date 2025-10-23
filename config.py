@@ -34,6 +34,10 @@ class AuthConfig:
     LOGIN_CREDENTIALS = {
         "hyehye": "h2t12345"
     }
+    
+    # 세션 관리
+    SESSION_SECRET = "marketing_tool_secret_key_2025"
+    SESSION_DURATION_DAYS = 7  # 세션 유지 기간 (일)
 
 # 애플리케이션 설정
 class AppConfig:
