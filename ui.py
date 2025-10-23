@@ -1,283 +1,20 @@
 """
-본 프로그램 'RankChecker by 쇼쇼'는 쇼쇼에 의해 개발된 소프트웨어입니다.
-해당 소스코드 및 실행 파일의 무단 복제, 배포, 역컴파일, 수정은
-저작권법 및 컴퓨터프로그램 보호법에 따라 엄격히 금지됩니다.
-
-무단 유포 및 상업적 이용 시 민형사상 법적 책임을 물을 수 있습니다.
-
-Copyright ⓒ 2025 쇼쇼. All rights reserved.
-Unauthorized reproduction or redistribution is strictly prohibited. 
+UI module for the marketing tool
+각 탭의 렌더링 함수들과 UI 컴포넌트
 """
 
 import streamlit as st
 import pandas as pd
-import os
-import json
-import urllib.request
-import urllib.parse
-import re
 import time
-import hashlib
-import hmac
-import base64
-from collections import Counter
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
-# 네이버 개발자 API
-client_id = os.getenv("NAVER_CLIENT_ID", "RMAReoKGgZ73JCL3AdhK")
-client_secret = os.getenv("NAVER_CLIENT_SECRET", "SZS7VRIQDT")
-
-# 네이버 광고센터 API (필요시 사용)
-CUSTOMER_ID = os.getenv("CUSTOMER_ID")
-ACCESS_LICENSE = os.getenv("ACCESS_LICENSE")
-SECRET_KEY = os.getenv("SECRET_KEY")
-
-def get_top_ranked_product_by_mall(keyword, mall_name):
-    """네이버 쇼핑에서 특정 키워드로 검색하여 지정된 판매처의 최고 순위 상품을 찾는 함수"""
-    encText = urllib.parse.quote(keyword)
-    seen_titles = set()
-    best_product = None
-    
-    for start in range(1, 1001, 100):
-        url = f"https://openapi.naver.com/v1/search/shop.json?query={encText}&display=100&start={start}"
-        request = urllib.request.Request(url)
-        request.add_header("X-Naver-Client-Id", client_id)
-        request.add_header("X-Naver-Client-Secret", client_secret)
-        
-        try:
-            response = urllib.request.urlopen(request)
-            result = json.loads(response.read())
-            
-            for idx, item in enumerate(result.get("items", []), start=1):
-                if item.get("mallName") and mall_name in item["mallName"]:
-                    title_clean = re.sub(r"<.*?>", "", item["title"])
-                    if title_clean in seen_titles:
-                        continue
-                    seen_titles.add(title_clean)
-                    
-                    rank = start + idx - 1
-                    product = {
-                        "rank": rank,
-                        "title": title_clean,
-                        "price": item["lprice"],
-                        "link": item["link"],
-                        "mallName": item["mallName"]
-                    }
-                    
-                    if not best_product or rank < best_product["rank"]:
-                        best_product = product
-        except Exception as e:
-            st.error(f"API 요청 중 오류가 발생했습니다: {e}")
-            break
-    
-    return best_product
-
-def get_signature(method, uri, timestamp, access_key, secret_key):
-    """네이버 검색광고 API 인증을 위한 서명 생성"""
-    message = f"{timestamp}.{method}.{uri}"
-    signature = base64.b64encode(
-        hmac.new(secret_key.encode(), message.encode(), hashlib.sha256).digest()
-    ).decode()
-    return signature
-
-def get_related_keywords_from_ads_api(keyword):
-    """네이버 검색광고 API를 사용하여 연관 키워드 추출"""
-    try:
-        # API 설정
-        BASE_URL = "https://api.naver.com"
-        API_PATH = "/keywordstool"
-        METHOD = "GET"
-        
-        # 인증 정보
-        access_license = ACCESS_LICENSE
-        secret_key = SECRET_KEY
-        customer_id = CUSTOMER_ID
-        
-        if not all([access_license, secret_key, customer_id]):
-            st.error("❌ 네이버 검색광고 API 설정이 필요합니다.")
-            return []
-        
-        # 타임스탬프 생성
-        timestamp = str(int(time.time() * 1000))
-        
-        # 서명 생성
-        signature = get_signature(METHOD, API_PATH, timestamp, access_license, secret_key)
-        
-        # 헤더 설정
-        headers = {
-            "X-Timestamp": timestamp,
-            "X-API-KEY": access_license,
-            "X-Customer": customer_id,
-            "X-Signature": signature,
-            "Content-Type": "application/json"
-        }
-        
-        # GET 방식으로 쿼리 파라미터 전송
-        query_params = urllib.parse.urlencode({
-            'hintKeywords': keyword,
-            'showDetail': '1'
-        })
-        url = f"{BASE_URL}{API_PATH}?{query_params}"
-        request = urllib.request.Request(url, headers=headers, method=METHOD)
-        
-        with urllib.request.urlopen(request) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            
-        # 결과 처리
-        related_keywords = []
-        if 'keywordList' in result:
-            for item in result['keywordList']:
-                # 검색량 처리 (문자열인 경우 0으로 처리)
-                pc_qc = item.get('monthlyPcQcCnt', 0)
-                mobile_qc = item.get('monthlyMobileQcCnt', 0)
-                
-                # "< 10" 같은 문자열 처리
-                if isinstance(pc_qc, str):
-                    pc_qc = 5 if "< 10" in pc_qc else 0
-                if isinstance(mobile_qc, str):
-                    mobile_qc = 5 if "< 10" in mobile_qc else 0
-                
-                related_keywords.append({
-                    'keyword': item.get('relKeyword', ''),
-                    'monthly_pc_qc': pc_qc,
-                    'monthly_mobile_qc': mobile_qc,
-                    'competition': item.get('compIdx', 'N/A'),
-                    'source': 'ads_api'
-                })
-        
-        return related_keywords
-        
-    except Exception as e:
-        st.error(f"❌ 검색광고 API 오류: {e}")
-        return []
-
-def get_shopping_related_keywords(keyword):
-    """네이버 쇼핑 API에서 연관 키워드를 추출하는 함수"""
-    encText = urllib.parse.quote(keyword)
-    related_keywords = []
-    all_data = []
-    
-    try:
-        progress_placeholder = st.empty()
-        
-        # 다양한 정렬 방식으로 검색
-        sort_options = ["sim", "date", "asc", "dsc"]
-        
-        for sort_type in sort_options:
-            for start in range(1, 301, 100):  # 각 정렬별로 3페이지씩
-                try:
-                    url = f"https://openapi.naver.com/v1/search/shop.json?query={encText}&display=100&start={start}&sort={sort_type}"
-                    request = urllib.request.Request(url)
-                    request.add_header("X-Naver-Client-Id", client_id)
-                    request.add_header("X-Naver-Client-Secret", client_secret)
-                    
-                    response = urllib.request.urlopen(request)
-                    result = json.loads(response.read())
-                    
-                    items = result.get("items", [])
-                    if not items:
-                        break
-                    
-                    for item in items:
-                        title_clean = re.sub(r"<.*?>", "", item.get("title", ""))
-                        category = item.get("category1", "") + " " + item.get("category2", "") + " " + item.get("category3", "") + " " + item.get("category4", "")
-                        brand = item.get("brand", "")
-                        mall = item.get("mallName", "")
-                        
-                        combined_text = f"{title_clean} {category} {brand} {mall}".strip()
-                        if combined_text:
-                            all_data.append(combined_text)
-                    
-                    current_count = len(all_data)
-                    progress_placeholder.text(f"📊 수집된 상품 데이터: {current_count}개 (정렬: {sort_type})")
-                    
-                    time.sleep(0.03)
-                    
-                except Exception as api_error:
-                    continue
-        
-        progress_placeholder.text(f"✅ 총 {len(all_data)}개 상품 데이터 수집 완료!")
-        
-        if not all_data:
-            return []
-        
-        # 키워드 추출
-        all_words = []
-        for text in all_data:
-            basic_words = re.findall(r'[가-힣a-zA-Z0-9]+', text)
-            phrases = re.findall(r'[가-힣a-zA-Z0-9\s]{2,20}', text)
-            clean_phrases = [phrase.strip() for phrase in phrases if len(phrase.strip()) >= 2]
-            unit_words = re.findall(r'\d+[가-힣a-zA-Z]+', text)
-            
-            extracted_words = basic_words + clean_phrases + unit_words
-            filtered_words = [word for word in extracted_words if 2 <= len(word) <= 30]
-            all_words.extend(filtered_words)
-        
-        word_counts = Counter(all_words)
-        
-        exclude_words = {
-            keyword.lower(), '상품', '제품', '브랜드', '공식', '정품', '무료', '배송', 
-            '할인', '세트', '특가', '이벤트', '쿠폰', '적립', '포인트', '원', '개', '매',
-            '구매', '판매', '스토어', '쇼핑', '마트', '몰', '샵', '온라인', '오프라인',
-            '신상', '신제품', '런칭', '출시', '한정', '단독', '독점', '전용', '추천',
-            '베스트', '인기', '랭킹', '순위', 'top', 'best', '당일', '오늘', '내일',
-            '빠른', '즉시', '바로', '직접', '직구', '해외', '국내', '한국', '전국',
-            '서울', '부산', '대구', '광주', '대전', '울산', '인천', '경기', '강원',
-            '리뷰', '후기', '평점', '별점', '만족', '불만', '최고', '최저', '평균'
-        }
-        
-        exclude_patterns = [r'^\d+$', r'^[a-zA-Z]{1}$', r'^.{1}$']
-        
-        for word, count in word_counts.most_common():
-            if (word.lower() not in exclude_words and 
-                word.lower() != keyword.lower() and 
-                len(word) >= 2 and 
-                count >= 1):
-                
-                exclude = False
-                for pattern in exclude_patterns:
-                    if re.match(pattern, word):
-                        exclude = True
-                        break
-                
-                if not exclude:
-                    related_keywords.append({
-                        'keyword': word,
-                        'frequency': count,
-                        'relevance_score': round((count / len(all_data)) * 100, 2),
-                        'source': 'shopping_api'
-                    })
-        
-        return related_keywords
-        
-    except Exception as e:
-        st.warning(f"쇼핑 API 오류: {e}")
-        return []
-
-def get_related_keywords(keyword):
-    """네이버 검색광고 API를 사용하여 연관 키워드 추출"""
-    # 네이버 검색광고 API에서 연관 키워드 가져오기
-    st.info("🎯 네이버 검색광고 API에서 연관 키워드 수집 중...")
-    related_keywords = get_related_keywords_from_ads_api(keyword)
-    
-    if related_keywords:
-        # 검색량 기준으로 정렬
-        related_keywords.sort(key=lambda x: (x.get('monthly_pc_qc', 0) + x.get('monthly_mobile_qc', 0)), reverse=True)
-        st.success(f"🎉 총 {len(related_keywords)}개의 연관 키워드를 발견했습니다!")
-        return related_keywords
-    else:
-        st.error("❌ 연관 키워드를 찾을 수 없습니다.")
-        return []
+from api import get_top_ranked_product_by_mall, get_related_keywords
+from config import AppConfig
 
 def render_rank_checker_tab():
     """순위 확인 탭 렌더링"""
     # 사이드바에 정보 표시
     with st.sidebar:
         st.info("### 📊 순위 확인\n1. 검색할 키워드들을 쉼표로 구분하여 입력\n2. 찾을 판매처명 입력\n3. 순위 확인 버튼 클릭")
-        st.warning("⚠️ 최대 10개의 키워드까지 검색 가능합니다.")
+        st.warning(f"⚠️ 최대 {AppConfig.MAX_KEYWORDS}개의 키워드까지 검색 가능합니다.")
     
     # 메인 입력 영역
     col1, col2 = st.columns([2, 1])
@@ -285,7 +22,7 @@ def render_rank_checker_tab():
     with col1:
         # 키워드 입력
         keywords_input = st.text_area(
-            "검색어 (최대 10개, 쉼표로 구분)",
+            f"검색어 (최대 {AppConfig.MAX_KEYWORDS}개, 쉼표로 구분)",
             placeholder="예: 키보드, 마우스, 충전기",
             height=100,
             key="rank_keywords"
@@ -299,7 +36,7 @@ def render_rank_checker_tab():
         )
         
         # 검색 버튼
-        search_button = st.button("🔍 순위 확인", type="primary", width="stretch", key="rank_search")
+        search_button = st.button("🔍 순위 확인", type="primary", use_container_width=True, key="rank_search")
     
     with col2:
         st.info("### 💡 팁\n- 정확한 판매처명을 입력하세요\n- 키워드는 구체적으로 입력할수록 정확합니다")
@@ -313,8 +50,8 @@ def render_rank_checker_tab():
         # 키워드 파싱
         keywords = [k.strip() for k in keywords_input.split(",") if k.strip()]
         
-        if len(keywords) > 10:
-            st.error("❌ 검색어는 최대 10개까지만 입력 가능합니다.")
+        if len(keywords) > AppConfig.MAX_KEYWORDS:
+            st.error(f"❌ 검색어는 최대 {AppConfig.MAX_KEYWORDS}개까지만 입력 가능합니다.")
             return
         
         # 검색 시작
@@ -380,14 +117,14 @@ def render_rank_checker_tab():
                 with col3:
                     st.write(f"{int(product['price']):,}원")
                 with col4:
-                    st.link_button("상품보기", product['link'], width="stretch")
+                    st.link_button("상품보기", product['link'], use_container_width=True)
 
 def render_related_keywords_tab():
     """연관 키워드 탭 렌더링"""
     # 사이드바에 정보 표시
     with st.sidebar:
         st.info("### 🔗 연관 키워드\n1. 기준이 될 키워드 입력\n2. 연관 키워드 검색 버튼 클릭\n3. 결과를 CSV로 다운로드 가능")
-        st.success("🎯 네이버 검색광고 API 사용!")
+        st.success("🎯 네이버 검색광고 API 전용!")
         st.info("📊 공식 검색광고 데이터")
         st.success("✨ 검색량, 경쟁도 정보 제공")
         st.warning("⚠️ 정확한 마케팅 데이터를 제공합니다.")
@@ -413,7 +150,7 @@ def render_related_keywords_tab():
         )
         
         # 검색 버튼
-        search_related_button = st.button("🎯 연관 키워드 검색 (검색광고 API)", type="primary", width="stretch", key="related_search")
+        search_related_button = st.button("🎯 연관 키워드 검색 (검색광고 API)", type="primary", use_container_width=True, key="related_search")
     
     with col2:
         st.info("### 💡 연관 키워드란?\n- 입력한 키워드와 함께 검색되는 단어들\n- 마케팅 키워드 발굴에 유용\n- 상품명 최적화에 활용 가능")
@@ -474,11 +211,75 @@ def render_related_keywords_tab():
             # 상위 키워드를 차트로 표시 (옵션에 따라)
             if show_top_chart:
                 st.subheader("📊 상위 연관 키워드")
-                chart_count = min(20, len(df))
+                chart_count = min(AppConfig.MAX_CHART_ITEMS, len(df))
                 top_keywords = df.head(chart_count)
                 
-                # 바 차트
-                st.bar_chart(data=top_keywords.set_index('keyword')['total_search'])
+                # 개선된 바 차트 (Y축 0 시작, 마우스 휠 비활성화, 가독성 향상)
+                import altair as alt
+                
+                # 최대값 계산 (여유 공간 10% 추가)
+                max_value = top_keywords['total_search'].max()
+                y_max = int(max_value * 1.1) if max_value > 0 else 100
+                
+                # Altair 차트 생성
+                chart = alt.Chart(top_keywords).mark_bar(
+                    color='steelblue',
+                    opacity=0.8
+                ).add_selection(
+                    alt.selection_single()
+                ).encode(
+                    x=alt.X(
+                        'total_search:Q', 
+                        title='총 검색량',
+                        scale=alt.Scale(domain=[0, y_max]),  # Y축 0부터 최대값+10%까지
+                        axis=alt.Axis(format=',.0f')  # 정수로 반올림 + 천단위 콤마 표시
+                    ),
+                    y=alt.Y(
+                        'keyword:N', 
+                        sort='-x', 
+                        title='키워드',
+                        axis=alt.Axis(labelLimit=150)  # 긴 키워드명 처리
+                    ),
+                    tooltip=[
+                        alt.Tooltip('keyword:N', title='키워드'),
+                        alt.Tooltip('total_search:Q', title='총 검색량', format=',.0f'),
+                        alt.Tooltip('pc_search:Q', title='PC 검색량', format=',.0f'),
+                        alt.Tooltip('mobile_search:Q', title='모바일 검색량', format=',.0f')
+                    ]
+                ).properties(
+                    height=400,
+                    title=alt.TitleParams(
+                        text="상위 연관 키워드 검색량 (검색광고 API)",
+                        fontSize=16,
+                        anchor='start'
+                    )
+                ).configure_axis(
+                    labelFontSize=11,
+                    titleFontSize=12
+                ).configure_title(
+                    fontSize=16,
+                    color='#2c3e50'
+                ).resolve_scale(
+                    color='independent'
+                )
+                
+                # 마우스 휠 비활성화 CSS
+                st.markdown(
+                    """
+                    <style>
+                    .stPlotlyChart > div {
+                        pointer-events: none;
+                    }
+                    div[data-testid="stVegaLiteChart"] > div {
+                        pointer-events: none !important;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+                # 차트 표시
+                st.altair_chart(chart, use_container_width=True)
             
             # 전체 결과 테이블
             st.subheader(f"📋 전체 연관 키워드 목록 ({len(df)}개)")
@@ -575,7 +376,7 @@ def render_related_keywords_tab():
                     data=csv_data,
                     file_name=f"{base_keyword}_연관키워드_필터_{time.strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv",
-                    width="stretch"
+                    use_container_width=True
                 )
             
             with col_download2:
@@ -590,7 +391,7 @@ def render_related_keywords_tab():
                     data=full_csv_data,
                     file_name=f"{base_keyword}_연관키워드_전체_{time.strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv",
-                    width="stretch"
+                    use_container_width=True
                 )
             
             # 키워드 클라우드 스타일 표시
@@ -602,37 +403,27 @@ def render_related_keywords_tab():
         else:
             st.warning("❌ 연관 키워드를 찾을 수 없습니다. 다른 키워드로 시도해보세요.")
 
-def main():
-    # 페이지 설정
-    st.set_page_config(
-        page_title="네이버 쇼핑 분석기 (by 쇼쇼)",
-        page_icon="🔍",
-        layout="wide"
-    )
-    
-    # 헤더
-    st.title("🔍 네이버 쇼핑 분석기")
-    st.subheader("by 쇼쇼")
-    
-    # 탭 생성
-    tab1, tab2 = st.tabs(["📊 순위 확인", "🔗 연관 키워드"])
-    
-    with tab1:
-        render_rank_checker_tab()
-    
-    with tab2:
-        render_related_keywords_tab()
-    
-    # 푸터
+def render_dashboard_metrics():
+    """대시보드 메트릭 렌더링"""
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("🎯 활성 API", "검색광고 API", "정상 작동")
+    with col2:
+        st.metric("📊 지원 기능", "2개", "순위 확인 + 키워드 분석")
+    with col3:
+        st.metric("🔍 분석 범위", "네이버 쇼핑", "전체 상품")
+    with col4:
+        st.metric("⚡ 응답 속도", "실시간", "빠른 분석")
+
+def render_footer():
+    """푸터 렌더링"""
     st.divider()
     st.markdown(
-        """
+        f"""
         <div style='text-align: center; color: gray; font-size: 12px;'>
-        ⓒ 2025 쇼쇼. 무단 복제 및 배포 금지. All rights reserved.
+        {AppConfig.COPYRIGHT_TEXT}<br>
+        Professional Marketing Tool - Authorized User Only
         </div>
         """,
         unsafe_allow_html=True
     )
-
-if __name__ == "__main__":
-    main()
