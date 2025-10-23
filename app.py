@@ -36,6 +36,9 @@ def render_navigation_sidebar():
         if st.button("⚙️ 설정", use_container_width=True):
             st.switch_page("pages/3_⚙️_설정.py")
         
+        if st.button("✍️ 글 재작성", use_container_width=True):
+            st.switch_page("pages/5_✍️_글_재작성.py")
+        
         st.markdown("---")
         
         # 시스템 상태
@@ -197,7 +200,10 @@ def render_dashboard_overview():
     </div>
     """, unsafe_allow_html=True)
     
-    # 심플한 기능 카드
+    # 기능 카드 섹션 (2행 3열 배치)
+    st.markdown("### 🚀 사용 가능한 기능들")
+    
+    # 첫 번째 행
     col1, col2, col3 = st.columns(3, gap="large")
     
     with col1:
@@ -232,6 +238,42 @@ def render_dashboard_overview():
         """, unsafe_allow_html=True)
         if st.button("시작하기", key="detail_btn", use_container_width=True):
             st.switch_page("pages/4_📊_키워드_상세_분석.py")
+    
+    # 두 번째 행
+    col4, col5, col6 = st.columns(3, gap="large")
+    
+    with col4:
+        st.markdown("""
+        <div class="feature-card">
+            <span class="feature-icon">✍️</span>
+            <h3 class="feature-title">글 재작성</h3>
+            <p class="feature-desc">AI 기반으로 상품 설명글을 전문적이고 매력적으로 재작성해보세요</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("시작하기", key="rewrite_btn", use_container_width=True):
+            st.switch_page("pages/5_✍️_글_재작성.py")
+    
+    with col5:
+        st.markdown("""
+        <div class="feature-card">
+            <span class="feature-icon">⚙️</span>
+            <h3 class="feature-title">설정</h3>
+            <p class="feature-desc">API 키 관리, 애플리케이션 환경설정 및 사용자 맞춤 설정을 관리하세요</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("시작하기", key="settings_btn", use_container_width=True):
+            st.switch_page("pages/3_⚙️_설정.py")
+    
+    with col6:
+        # 빈 공간 또는 추후 확장용
+        st.markdown("""
+        <div class="feature-card" style="opacity: 0.6; border-style: dashed;">
+            <span class="feature-icon">🔮</span>
+            <h3 class="feature-title">추가 기능</h3>
+            <p class="feature-desc">더 많은 마케팅 도구들이 곧 추가될 예정입니다</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.button("준비 중", key="future_btn", use_container_width=True, disabled=True)
     
 
 

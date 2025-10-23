@@ -282,15 +282,17 @@ def get_detailed_keyword_stats(keyword: str) -> list:
         return []
 
 def get_related_keywords(keyword: str) -> list:
-    """네이버 검색광고 API를 사용하여 연관 키워드 추출"""
-    st.info("🎯 네이버 검색광고 API에서 연관 키워드 수집 중...")
-    related_keywords = get_related_keywords_from_ads_api(keyword)
+    """네이버 검색광고 API를 사용하여 연관 키워드 및 상세 통계 추출"""
+    st.info("🎯 네이버 검색광고 API에서 상세 키워드 데이터 수집 중...")
     
-    if related_keywords:
+    # 상세 통계 데이터 수집
+    detailed_keywords = get_detailed_keyword_stats(keyword)
+    
+    if detailed_keywords:
         # 검색량 기준으로 정렬
-        related_keywords.sort(key=lambda x: (x.get('monthly_pc_qc', 0) + x.get('monthly_mobile_qc', 0)), reverse=True)
-        st.success(f"🎉 총 {len(related_keywords)}개의 연관 키워드를 발견했습니다!")
-        return related_keywords
+        detailed_keywords.sort(key=lambda x: x.get('total_monthly_search', 0), reverse=True)
+        st.success(f"🎉 총 {len(detailed_keywords)}개의 연관 키워드와 상세 통계를 발견했습니다!")
+        return detailed_keywords
     else:
         st.error("❌ 연관 키워드를 찾을 수 없습니다.")
         return []

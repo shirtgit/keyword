@@ -11,6 +11,25 @@ from api import get_related_keywords
 from config import AppConfig, AuthConfig
 from auth import initialize_session, is_logged_in, logout_user
 
+def safe_float_conversion(value):
+    """안전한 float 변환 함수"""
+    if pd.isna(value):
+        return 0
+    
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        # 문자열 경쟁도를 숫자로 변환
+        if isinstance(value, str):
+            value = value.lower()
+            if '높음' in value or 'high' in value:
+                return 80
+            elif '보통' in value or 'medium' in value or '중간' in value:
+                return 50
+            elif '낮음' in value or 'low' in value:
+                return 20
+        return 0
+
 def render_navigation_sidebar():
     """사이드바 네비게이션 렌더링"""
     with st.sidebar:
@@ -152,16 +171,30 @@ def render_related_keywords_page():
                 # 결과 개수 제한
                 df = df.head(result_count)
                 
-                # 정렬 (안전하게 처리)
-                if sort_by == "검색량" and 'monthlyPcQcCnt' in df.columns:
-                    df = df.sort_values('monthlyPcQcCnt', ascending=False)
-                elif sort_by == "경쟁도" and 'compIdx' in df.columns:
-                    df = df.sort_values('compIdx', ascending=False)
-                elif 'relKeyword' in df.columns:  # 키워드명
-                    df = df.sort_values('relKeyword')
+                # 정렬 (새로운 데이터 구조에 맞게 처리)
+                if sort_by == "검색량":
+                    # 새로운 컬럼명으로 정렬
+                    if 'total_monthly_search' in df.columns:
+                        df = df.sort_values('total_monthly_search', ascending=False)
+                    elif 'monthlyPcQcCnt' in df.columns:
+                        df = df.sort_values('monthlyPcQcCnt', ascending=False)
+                elif sort_by == "경쟁도":
+                    if 'competition_index' in df.columns:
+                        df = df.sort_values('competition_index', ascending=False)
+                    elif 'compIdx' in df.columns:
+                        df = df.sort_values('compIdx', ascending=False)
+                elif sort_by == "키워드명":
+                    # 키워드명으로 정렬
+                    if 'keyword' in df.columns:
+                        df = df.sort_values('keyword')
+                    elif 'relKeyword' in df.columns:
+                        df = df.sort_values('relKeyword')
                 else:
-                    # 기본적으로 첫 번째 컬럼으로 정렬
-                    df = df.sort_values(df.columns[0])
+                    # 기본적으로 검색량으로 정렬
+                    if 'total_monthly_search' in df.columns:
+                        df = df.sort_values('total_monthly_search', ascending=False)
+                    else:
+                        df = df.sort_values(df.columns[0])
                 
                 # 결과 저장 (세션 상태)
                 st.session_state.keywords_result = df
@@ -194,7 +227,10 @@ def render_related_keywords_page():
             """.format(len(df)), unsafe_allow_html=True)
         
         with col2:
-            if 'monthlyPcQcCnt' in df.columns and not df['monthlyPcQcCnt'].empty:
+            # 새로운 데이터 구조에서 평균 검색량 계산
+            if 'total_monthly_search' in df.columns and not df['total_monthly_search'].empty:
+                avg_search = int(df['total_monthly_search'].mean())
+            elif 'monthlyPcQcCnt' in df.columns and not df['monthlyPcQcCnt'].empty:
                 avg_search = int(df['monthlyPcQcCnt'].mean())
             else:
                 avg_search = 0
@@ -206,7 +242,10 @@ def render_related_keywords_page():
             """.format(avg_search), unsafe_allow_html=True)
         
         with col3:
-            if 'monthlyPcQcCnt' in df.columns and not df['monthlyPcQcCnt'].empty:
+            # 새로운 데이터 구조에서 최고 검색량 계산
+            if 'total_monthly_search' in df.columns and not df['total_monthly_search'].empty:
+                max_search = int(df['total_monthly_search'].max())
+            elif 'monthlyPcQcCnt' in df.columns and not df['monthlyPcQcCnt'].empty:
                 max_search = int(df['monthlyPcQcCnt'].max())
             else:
                 max_search = 0
@@ -218,58 +257,77 @@ def render_related_keywords_page():
             """.format(max_search), unsafe_allow_html=True)
         
         with col4:
-            if 'compIdx' in df.columns and not df['compIdx'].empty:
-                avg_competition = df['compIdx'].mean()
+            # 새로운 데이터 구조에서 평균 클릭률 표시
+            if 'total_monthly_avg_ctr' in df.columns and not df['total_monthly_avg_ctr'].empty:
+                avg_ctr = df['total_monthly_avg_ctr'].mean()
             else:
-                avg_competition = 0
+                avg_ctr = 0
             st.markdown("""
             <div class="metric-card">
-                <h3 style="color: var(--mint-dark); margin: 0;">⚔️ 평균 경쟁도</h3>
-                <p style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0 0 0;">{:.1f}</p>
+                <h3 style="color: var(--mint-dark); margin: 0;">📊 평균 CTR</h3>
+                <p style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0 0 0;">{:.2f}%</p>
             </div>
-            """.format(avg_competition), unsafe_allow_html=True)
+            """.format(avg_ctr), unsafe_allow_html=True)
         
         # 키워드 목록
         st.markdown("### 📋 연관 키워드 목록")
         
         for idx, row in df.iterrows():
-            # 키워드명 (안전하게 가져오기)
-            keyword = row.get('relKeyword', row.get('keyword', f'키워드_{idx}'))
+            # 키워드명 (새로운 구조에서 가져오기)
+            keyword = row.get('keyword', row.get('relKeyword', f'키워드_{idx}'))
             
-            # 검색량 (안전하게 가져오기)
-            search_count = 0
-            if 'monthlyPcQcCnt' in row and pd.notna(row['monthlyPcQcCnt']):
-                search_count = int(row['monthlyPcQcCnt'])
-            elif 'searchCount' in row and pd.notna(row['searchCount']):
-                search_count = int(row['searchCount'])
+            # 통계 데이터 (새로운 구조에서 가져오기)
+            total_search = int(row.get('total_monthly_search', 0))
+            pc_search = int(row.get('monthly_pc_search', 0))
+            mobile_search = int(row.get('monthly_mobile_search', 0))
             
-            # 경쟁도 (안전하게 가져오기)
-            competition = 0
-            if 'compIdx' in row and pd.notna(row['compIdx']):
-                competition = float(row['compIdx'])
-            elif 'competition' in row and pd.notna(row['competition']):
-                competition = float(row['competition'])
+            total_click = int(row.get('total_monthly_avg_click', 0))
+            pc_click = int(row.get('monthly_avg_pc_click', 0))
+            mobile_click = int(row.get('monthly_avg_mobile_click', 0))
+            
+            total_ctr = row.get('total_monthly_avg_ctr', 0)
+            pc_ctr = row.get('monthly_avg_pc_ctr', 0)
+            mobile_ctr = row.get('monthly_avg_mobile_ctr', 0)
+            
+            competition_level = row.get('competition_level', '알 수 없음')
+            competition_index = row.get('competition_index', 'N/A')
             
             # 경쟁도에 따른 색상 결정
-            if competition >= 80:
+            if competition_level == '높음':
                 comp_color = "🔴"
-                comp_text = "높음"
-            elif competition >= 50:
+            elif competition_level == '보통':
                 comp_color = "🟡"
-                comp_text = "보통"
             else:
                 comp_color = "🟢"
-                comp_text = "낮음"
             
+            # 상세 정보가 포함된 카드 표시
             st.markdown(f"""
-            <div class="keyword-item">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h4 style="margin: 0; color: var(--mint-dark);">🔗 {keyword}</h4>
+            <div class="keyword-item" style="background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #20B2AA;">🔗 {keyword}</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                            <div>
+                                <strong>📱 총 검색량:</strong> {total_search:,}<br>
+                                <span style="color: #666;">PC: {pc_search:,} | 모바일: {mobile_search:,}</span>
+                            </div>
+                            <div>
+                                <strong>👆 총 클릭수:</strong> {total_click:,}<br>
+                                <span style="color: #666;">PC: {pc_click:,} | 모바일: {mobile_click:,}</span>
+                            </div>
+                            <div>
+                                <strong>📊 평균 CTR:</strong> {total_ctr:.2f}%<br>
+                                <span style="color: #666;">PC: {pc_ctr:.2f}% | 모바일: {mobile_ctr:.2f}%</span>
+                            </div>
+                        </div>
                     </div>
-                    <div style="text-align: right;">
-                        <span style="font-size: 1.1rem; font-weight: bold;">📊 {search_count:,}</span><br>
-                        <span style="font-size: 0.9rem;">{comp_color} 경쟁도: {comp_text} ({competition:.1f})</span>
+                    <div style="text-align: right; min-width: 120px;">
+                        <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">
+                            � {total_search:,}
+                        </div>
+                        <div style="font-size: 0.9rem;">
+                            {comp_color} 경쟁도: {competition_level}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -287,56 +345,106 @@ def render_related_keywords_page():
         keyword_col = None
         competition_col = None
         
-        # 사용 가능한 컬럼 찾기
-        for col in ['monthlyPcQcCnt', 'searchCount', 'search_volume']:
+        # 새로운 데이터 구조에서 컬럼 찾기
+        search_col = None
+        keyword_col = None
+        click_col = None
+        ctr_col = None
+        
+        # 검색량 컬럼
+        for col in ['total_monthly_search', 'monthlyPcQcCnt', 'searchCount']:
             if col in chart_df.columns:
                 search_col = col
                 break
         
-        for col in ['relKeyword', 'keyword', 'name']:
+        # 키워드 컬럼
+        for col in ['keyword', 'relKeyword', 'name']:
             if col in chart_df.columns:
                 keyword_col = col
                 break
-                
-        for col in ['compIdx', 'competition', 'comp']:
+        
+        # 클릭수 컬럼
+        for col in ['total_monthly_avg_click', 'monthly_avg_pc_click']:
             if col in chart_df.columns:
-                competition_col = col
+                click_col = col
+                break
+                
+        # CTR 컬럼
+        for col in ['total_monthly_avg_ctr', 'monthly_avg_pc_ctr']:
+            if col in chart_df.columns:
+                ctr_col = col
                 break
         
+        # 1. 검색량 차트
         if search_col and keyword_col:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.subheader("🔍 키워드별 검색량")
-            
             try:
-                chart = alt.Chart(chart_df).mark_bar(color='#40E0D0').encode(
-                    x=alt.X(f'{search_col}:Q', title='검색량'),
+                search_chart = alt.Chart(chart_df).mark_bar(color='#40E0D0').encode(
+                    x=alt.X(f'{search_col}:Q', title='월간 검색량'),
                     y=alt.Y(f'{keyword_col}:N', sort='-x', title='키워드'),
-                    tooltip=[f'{keyword_col}:N', f'{search_col}:Q'] + ([f'{competition_col}:Q'] if competition_col else [])
+                    tooltip=[
+                        alt.Tooltip(f'{keyword_col}:N', title='키워드'),
+                        alt.Tooltip(f'{search_col}:Q', title='월간 검색량', format=',')
+                    ] + ([alt.Tooltip(f'{click_col}:Q', title='월간 클릭수', format=',')] if click_col else [])
                 ).properties(height=400)
                 
-                st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(search_chart, use_container_width=True)
             except Exception as e:
-                st.warning(f"차트를 생성할 수 없습니다: {str(e)}")
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.warning(f"검색량 차트를 생성할 수 없습니다: {str(e)}")
         
-        # 경쟁도 vs 검색량 산점도 (두 데이터가 모두 있을 때만)
-        if search_col and competition_col and keyword_col:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.subheader("⚔️ 경쟁도 vs 검색량 관계")
-            
+        # 2. 클릭수 차트
+        if click_col and keyword_col:
+            st.subheader("👆 키워드별 클릭수")
+            try:
+                click_chart = alt.Chart(chart_df).mark_bar(color='#20B2AA').encode(
+                    x=alt.X(f'{click_col}:Q', title='월간 클릭수'),
+                    y=alt.Y(f'{keyword_col}:N', sort='-x', title='키워드'),
+                    tooltip=[
+                        alt.Tooltip(f'{keyword_col}:N', title='키워드'),
+                        alt.Tooltip(f'{click_col}:Q', title='월간 클릭수', format=','),
+                        alt.Tooltip(f'{search_col}:Q', title='월간 검색량', format=',')
+                    ]
+                ).properties(height=400)
+                
+                st.altair_chart(click_chart, use_container_width=True)
+            except Exception as e:
+                st.warning(f"클릭수 차트를 생성할 수 없습니다: {str(e)}")
+        
+        # 3. CTR 차트
+        if ctr_col and keyword_col:
+            st.subheader("📊 키워드별 클릭률 (CTR)")
+            try:
+                ctr_chart = alt.Chart(chart_df).mark_bar(color='#48D1CC').encode(
+                    x=alt.X(f'{ctr_col}:Q', title='클릭률 (%)'),
+                    y=alt.Y(f'{keyword_col}:N', sort='-x', title='키워드'),
+                    tooltip=[
+                        alt.Tooltip(f'{keyword_col}:N', title='키워드'),
+                        alt.Tooltip(f'{ctr_col}:Q', title='클릭률 (%)', format='.2f')
+                    ]
+                ).properties(height=400)
+                
+                st.altair_chart(ctr_chart, use_container_width=True)
+            except Exception as e:
+                st.warning(f"CTR 차트를 생성할 수 없습니다: {str(e)}")
+        
+        # 4. 검색량 vs 클릭수 산점도
+        if search_col and click_col and keyword_col:
+            st.subheader("📈 검색량 vs 클릭수 관계")
             try:
                 scatter_chart = alt.Chart(chart_df).mark_circle(size=100, color='#20B2AA').encode(
-                    x=alt.X(f'{competition_col}:Q', title='경쟁도'),
-                    y=alt.Y(f'{search_col}:Q', title='검색량'),
-                    tooltip=[f'{keyword_col}:N', f'{search_col}:Q', f'{competition_col}:Q']
+                    x=alt.X(f'{search_col}:Q', title='월간 검색량'),
+                    y=alt.Y(f'{click_col}:Q', title='월간 클릭수'),
+                    tooltip=[
+                        alt.Tooltip(f'{keyword_col}:N', title='키워드'),
+                        alt.Tooltip(f'{search_col}:Q', title='월간 검색량', format=','),
+                        alt.Tooltip(f'{click_col}:Q', title='월간 클릭수', format=','),
+                        alt.Tooltip(f'{ctr_col}:Q', title='CTR (%)', format='.2f')
+                    ]
                 ).properties(height=400)
                 
                 st.altair_chart(scatter_chart, use_container_width=True)
             except Exception as e:
                 st.warning(f"산점도를 생성할 수 없습니다: {str(e)}")
-            
-            st.markdown('</div>', unsafe_allow_html=True)
         
         # 데이터가 없는 경우 안내
         if not search_col:
