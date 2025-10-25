@@ -163,16 +163,24 @@ def render_keyword_detail_analysis_page():
     
     st.markdown("---")
     
-    # 기능 설명
-    st.info("""
-    ### 📊 키워드 상세 분석 기능
-    - **🔍 월간검색수**: PC/모바일 분리된 정확한 검색량 데이터
-    - **👆 월평균클릭수**: 광고 클릭수 통계 (PC/모바일)
-    - **📈 월평균클릭률(CTR)**: 검색 대비 클릭 전환율
-    - **⚔️ 경쟁정도**: 키워드 광고 경쟁 강도 지수
-    - **👁️ 월평균노출수**: 광고 노출 빈도 추정
-    - **📢 광고수 추정**: 경쟁 광고주 수 예측
-    """)
+    # 기능 설명 - 스타일 개선
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, rgba(32, 178, 170, 0.1), rgba(72, 209, 204, 0.1)); 
+                border-left: 4px solid #20B2AA; 
+                border-radius: 8px; 
+                padding: 1.5rem; 
+                margin-bottom: 1.5rem;'>
+        <h3 style='color: #20B2AA; margin-top: 0;'>📊 키워드 상세 분석 기능</h3>
+        <ul style='margin-bottom: 0; line-height: 1.8;'>
+            <li><strong>🔍 월간검색수:</strong> PC/모바일 분리된 정확한 검색량 데이터</li>
+            <li><strong>👆 월평균클릭수:</strong> 광고 클릭수 통계 (PC/모바일)</li>
+            <li><strong>📈 월평균클릭률(CTR):</strong> 검색 대비 클릭 전환율</li>
+            <li><strong>⚔️ 경쟁정도:</strong> 키워드 광고 경쟁 강도 지수</li>
+            <li><strong>👁️ 월평균노출수:</strong> 광고 노출 빈도 추정</li>
+            <li><strong>📢 광고수 추정:</strong> 경쟁 광고주 수 예측</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
     
     # 사이드바에 도움말 표시
     with st.sidebar:
@@ -270,35 +278,59 @@ def render_keyword_detail_analysis_page():
     st.markdown("---")
     st.markdown("### 📖 키워드 상세 분석 가이드")
     
-    # 3개 칼럼으로 가이드 배치
+    # 3개 칼럼으로 가이드 배치 - 스타일 개선
     guide_col1, guide_col2, guide_col3 = st.columns(3)
     
     with guide_col1:
-        st.success("""
-        ### 🎯 마케팅 전략 수립
-        - **기회 키워드**: 높은 CTR + 낮은 경쟁도
-        - **주력 키워드**: 높은 검색량 + 높은 경쟁도
-        - **최적화 필요**: 낮은 CTR 키워드 개선
-        - **롱테일 발굴**: 구체적이고 긴 키워드 조합
-        """)
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, rgba(32, 178, 170, 0.08), rgba(72, 209, 204, 0.08)); 
+                    border: 1px solid rgba(32, 178, 170, 0.3); 
+                    border-radius: 8px; 
+                    padding: 1.2rem; 
+                    height: 100%;'>
+            <h3 style='color: #20B2AA; font-size: 1.1rem; margin-top: 0;'>🎯 마케팅 전략 수립</h3>
+            <ul style='margin-bottom: 0; line-height: 1.6; font-size: 0.9rem;'>
+                <li><strong>기회 키워드:</strong> 높은 CTR + 낮은 경쟁도</li>
+                <li><strong>주력 키워드:</strong> 높은 검색량 + 높은 경쟁도</li>
+                <li><strong>최적화 필요:</strong> 낮은 CTR 키워드 개선</li>
+                <li><strong>롱테일 발굴:</strong> 구체적이고 긴 키워드 조합</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with guide_col2:
-        st.info("""
-        ### 📊 ROI 분석 포인트
-        - **클릭률 우선**: CTR이 높은 키워드 집중
-        - **경쟁도 고려**: 경쟁도 대비 검색량 분석
-        - **디바이스 분석**: PC vs 모바일 비중 파악
-        - **효율성 계산**: 광고비 대비 전환율 예측
-        """)
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, rgba(32, 178, 170, 0.08), rgba(72, 209, 204, 0.08)); 
+                    border: 1px solid rgba(72, 209, 204, 0.3); 
+                    border-radius: 8px; 
+                    padding: 1.2rem; 
+                    height: 100%;'>
+            <h3 style='color: #48D1CC; font-size: 1.1rem; margin-top: 0;'>📊 ROI 분석 포인트</h3>
+            <ul style='margin-bottom: 0; line-height: 1.6; font-size: 0.9rem;'>
+                <li><strong>클릭률 우선:</strong> CTR이 높은 키워드 집중</li>
+                <li><strong>경쟁도 고려:</strong> 경쟁도 대비 검색량 분석</li>
+                <li><strong>디바이스 분석:</strong> PC vs 모바일 비중 파악</li>
+                <li><strong>효율성 계산:</strong> 광고비 대비 전환율 예측</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with guide_col3:
-        st.warning("""
-        ### ⚠️ 주의사항 및 한계
-        - **계절성 키워드**: 시기별 검색량 변동 고려
-        - **브랜드 키워드**: 타사 브랜드명 사용 주의
-        - **예산 효율성**: 광고비 예산 대비 ROI 계산
-        - **데이터 변동**: 실시간 데이터로 수시 변경
-        """)
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, rgba(32, 178, 170, 0.08), rgba(72, 209, 204, 0.08)); 
+                    border: 1px solid rgba(255, 193, 7, 0.3); 
+                    border-radius: 8px; 
+                    padding: 1.2rem; 
+                    height: 100%;'>
+            <h3 style='color: #FFA500; font-size: 1.1rem; margin-top: 0;'>⚠️ 주의사항 및 한계</h3>
+            <ul style='margin-bottom: 0; line-height: 1.6; font-size: 0.9rem;'>
+                <li><strong>계절성 키워드:</strong> 시기별 검색량 변동 고려</li>
+                <li><strong>브랜드 키워드:</strong> 타사 브랜드명 사용 주의</li>
+                <li><strong>예산 효율성:</strong> 광고비 예산 대비 ROI 계산</li>
+                <li><strong>데이터 변동:</strong> 실시간 데이터로 수시 변경</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     # 분석 실행
     if analyze_button:
