@@ -33,11 +33,11 @@ def render_navigation_sidebar():
         if st.button("📊 키워드 상세 분석", use_container_width=True):
             st.switch_page("pages/4_📊_키워드_상세_분석.py")
         
-        if st.button("⚙️ 설정", use_container_width=True):
-            st.switch_page("pages/3_⚙️_설정.py")
-        
         if st.button("✍️ 글 재작성", use_container_width=True):
             st.switch_page("pages/5_✍️_글_재작성.py")
+        
+        if st.button("⚙️ 설정", use_container_width=True):
+            st.switch_page("pages/3_⚙️_설정.py")
         
         st.markdown("---")
         
