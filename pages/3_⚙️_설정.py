@@ -34,6 +34,9 @@ def render_navigation_sidebar():
         if st.button("📊 키워드 상세 분석", use_container_width=True):
             st.switch_page("pages/4_📊_키워드_상세_분석.py")
         
+        if st.button("✍️ 글 재작성", use_container_width=True):
+            st.switch_page("pages/5_✍️_글_재작성.py")
+        
         if st.button("⚙️ 설정", use_container_width=True, disabled=True):
             st.switch_page("pages/3_⚙️_설정.py")
         
@@ -71,12 +74,81 @@ def render_navigation_sidebar():
 
 def render_settings_page():
     """설정 페이지 렌더링"""
+    # CSS 스타일 추가
+    st.markdown("""
+    <style>
+    /* 컨테이너 최적화 */
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 4rem;
+        padding-right: 4rem;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    /* 헤더 스타일 */
+    .page-header {
+        background: linear-gradient(135deg, #20B2AA, #48D1CC);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 12px rgba(32, 178, 170, 0.3);
+    }
+    
+    .page-title {
+        color: white !important;
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .page-subtitle {
+        color: rgba(255,255,255,0.9) !important;
+        font-size: 1rem;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    /* 버튼 스타일 */
+    .stButton > button {
+        background: linear-gradient(135deg, #20B2AA, #48D1CC) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 6px rgba(32, 178, 170, 0.3);
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #48D1CC, #40E0D0) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(32, 178, 170, 0.4);
+    }
+    
+    /* 여백 최적화 */
+    .element-container {
+        margin-bottom: 0.5rem;
+    }
+    
+    .row-widget {
+        padding: 0.2rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # 사이드바 네비게이션
     render_navigation_sidebar()
     
     # 헤더
-    st.title("⚙️ 시스템 설정")
-    st.markdown("**시스템 환경설정 및 계정 관리**")
+    st.markdown("""
+    <div class="page-header">
+        <h1 class="page-title">⚙️ 시스템 설정</h1>
+        <p class="page-subtitle">시스템 환경설정 및 계정 관리</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     

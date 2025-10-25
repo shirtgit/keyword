@@ -97,7 +97,7 @@ def render_related_keywords_page():
     # 민트 테마 CSS 적용
     st.markdown("""
     <style>
-    .main .block-container { padding-top: 2rem; max-width: 1200px; }
+    .main .block-container { padding-top: 2rem; padding-left: 4rem; padding-right: 4rem; max-width: 1400px; margin-left: auto; margin-right: auto; }
     :root {
         --mint-primary: #40E0D0; --mint-secondary: #48D1CC; --mint-light: #AFEEEE;
         --mint-dark: #20B2AA; --mint-gradient: linear-gradient(135deg, #20B2AA, #48D1CC);

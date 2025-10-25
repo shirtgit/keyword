@@ -233,7 +233,11 @@ def render_content_rewriter_page():
     <style>
     .main .block-container {
         padding-top: 2rem;
-        max-width: 1200px;
+        padding-left: 4rem;
+        padding-right: 4rem;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
     }
     
     .rewriter-header {

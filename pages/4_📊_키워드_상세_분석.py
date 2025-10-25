@@ -87,7 +87,11 @@ def render_keyword_detail_analysis_page():
     .main .block-container {
         padding-top: 1rem;
         padding-bottom: 1rem;
-        max-width: 1200px;
+        padding-left: 4rem;
+        padding-right: 4rem;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
     }
     
     /* 헤더 스타일 */

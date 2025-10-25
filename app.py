@@ -66,7 +66,11 @@ def render_dashboard_overview():
     .main .block-container {
         padding-top: 1rem;
         padding-bottom: 1rem;
-        max-width: 1200px;
+        padding-left: 4rem;
+        padding-right: 4rem;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
     }
     
     /* 헤더 스타일 - 고정 색상으로 가독성 보장 */
